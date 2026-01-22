@@ -85,7 +85,7 @@ export default function AdminPage() {
           />
           <Button
             onClick={() => {
-              if (passcode === "dreamplay2026") setIsAuthenticated(true)
+              if (passcode === "sorenkier") setIsAuthenticated(true)
               else alert("Wrong code")
             }}
           >
