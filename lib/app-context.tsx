@@ -1,6 +1,12 @@
 "use client"
 
-import { createContext, useContext, useState, type ReactNode } from "react"
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react"
+import { createClient } from "@supabase/supabase-js"
+
+// Initialize Supabase Client
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 export interface App {
   id: string
@@ -12,77 +18,63 @@ export interface App {
   status: "Live" | "Beta" | "Free"
 }
 
-const initialApps: App[] = [
-  {
-    id: "1",
-    name: "DreamPlay Vision",
-    description: "AI Hand Analysis",
-    url: "https://vision.dreamplay.studio",
-    icon: "Video",
-    category: "Tools",
-    status: "Beta",
-  },
-  {
-    id: "2",
-    name: "DreamLink",
-    description: "Link-in-bio for musicians",
-    url: "https://link.dreamplay.studio",
-    icon: "Link",
-    category: "Tools",
-    status: "Free",
-  },
-  {
-    id: "3",
-    name: "Piano CRM",
-    description: "Student management system",
-    url: "https://crm.dreamplay.studio",
-    icon: "Users",
-    category: "Business",
-    status: "Live",
-  },
-  {
-    id: "4",
-    name: "Masterclass",
-    description: "Video lesson platform",
-    url: "https://masterclass.dreamplay.studio",
-    icon: "Play",
-    category: "Learning",
-    status: "Live",
-  },
-]
-
 interface AppContextType {
   apps: App[]
-  addApp: (app: Omit<App, "id">) => void
-  updateApp: (id: string, app: Omit<App, "id">) => void
-  deleteApp: (id: string) => void
+  isLoading: boolean
+  addApp: (app: Omit<App, "id">) => Promise<void>
+  updateApp: (id: string, app: Omit<App, "id">) => Promise<void>
+  deleteApp: (id: string) => Promise<void>
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined)
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [apps, setApps] = useState<App[]>(initialApps)
+  const [apps, setApps] = useState<App[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const addApp = (app: Omit<App, "id">) => {
-    const newApp: App = {
-      ...app,
-      id: Date.now().toString(),
+  // 1. Fetch Apps on Load
+  useEffect(() => {
+    fetchApps()
+  }, [])
+
+  const fetchApps = async () => {
+    const { data, error } = await supabase.from('apps').select('*').order('created_at', { ascending: true })
+    if (!error && data) setApps(data as App[])
+    setIsLoading(false)
+  }
+
+  // 2. Add App
+  const addApp = async (appData: Omit<App, "id">) => {
+    // Optimistic UI update (show it immediately before DB confirms)
+    const tempId = Math.random().toString()
+    setApps(prev => [...prev, { ...appData, id: tempId }])
+
+    const { data, error } = await supabase.from('apps').insert([appData]).select()
+
+    if (data) {
+      // Replace temp ID with real ID
+      setApps(prev => prev.map(a => a.id === tempId ? data[0] : a))
+    } else {
+      // Revert if error
+      console.error(error)
+      fetchApps()
     }
-    setApps((prev) => [...prev, newApp])
   }
 
-  const updateApp = (id: string, updatedApp: Omit<App, "id">) => {
-    setApps((prev) =>
-      prev.map((app) => (app.id === id ? { ...updatedApp, id } : app))
-    )
+  // 3. Update App
+  const updateApp = async (id: string, appData: Omit<App, "id">) => {
+    setApps(prev => prev.map(a => a.id === id ? { ...appData, id } : a)) // Optimistic
+    await supabase.from('apps').update(appData).eq('id', id)
   }
 
-  const deleteApp = (id: string) => {
-    setApps((prev) => prev.filter((app) => app.id !== id))
+  // 4. Delete App
+  const deleteApp = async (id: string) => {
+    setApps(prev => prev.filter(a => a.id !== id)) // Optimistic
+    await supabase.from('apps').delete().eq('id', id)
   }
 
   return (
-    <AppContext.Provider value={{ apps, addApp, updateApp, deleteApp }}>
+    <AppContext.Provider value={{ apps, isLoading, addApp, updateApp, deleteApp }}>
       {children}
     </AppContext.Provider>
   )

@@ -6,6 +6,7 @@ import { useState } from "react"
 import { useApps, type App } from "@/lib/app-context"
 import { AppFormDialog } from "@/components/app-form-dialog"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import {
   ArrowLeft,
@@ -66,6 +67,34 @@ export default function AdminPage() {
   const { apps, addApp, updateApp, deleteApp } = useApps()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingApp, setEditingApp] = useState<App | null>(null)
+
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [passcode, setPasscode] = useState("")
+
+  // Simple Gate
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white">
+        <div className="flex flex-col gap-4 w-64">
+          <h2 className="text-center font-semibold text-slate-800">Admin Access</h2>
+          <Input
+            type="password"
+            placeholder="Enter Passcode"
+            value={passcode}
+            onChange={(e) => setPasscode(e.target.value)}
+          />
+          <Button
+            onClick={() => {
+              if (passcode === "dreamplay2026") setIsAuthenticated(true)
+              else alert("Wrong code")
+            }}
+          >
+            Enter
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   const handleAdd = () => {
     setEditingApp(null)
